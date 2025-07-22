@@ -3,44 +3,109 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Simple URL Loader</title>
+<title>Proxy Page Loader</title>
 <style>
+  /* Reset & base */
+  * {
+    box-sizing: border-box;
+  }
   body, html {
     margin: 0; padding: 0; height: 100%;
-    font-family: Arial, sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f7f9fc;
+    display: flex;
+    flex-direction: column;
   }
-  #navbar {
-    padding: 10px;
-    background: #eee;
+
+  header {
+    background: #2c3e50;
+    color: white;
+    padding: 1rem 1.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-align: center;
   }
+
+  #search-bar {
+    display: flex;
+    padding: 1rem 1.5rem;
+    background: white;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.1);
+    align-items: center;
+    gap: 0.75rem;
+  }
+
   #urlInput {
-    width: 80%;
-    font-size: 16px;
-    padding: 6px 8px;
+    flex-grow: 1;
+    font-size: 1rem;
+    padding: 0.6rem 1rem;
+    border-radius: 5px;
+    border: 1.8px solid #ccc;
+    transition: border-color 0.3s;
   }
+
+  #urlInput:focus {
+    outline: none;
+    border-color: #3498db;
+  }
+
   #goBtn {
-    font-size: 16px;
-    padding: 6px 12px;
+    background: #3498db;
+    border: none;
+    color: white;
+    padding: 0.7rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
   }
-  #content {
-    height: calc(100vh - 50px);
+
+  #goBtn:hover {
+    background: #2980b9;
   }
+
+  #frame-container {
+    flex-grow: 1;
+    border-top: 1px solid #e1e4e8;
+    position: relative;
+  }
+
   iframe {
     width: 100%;
     height: 100%;
     border: none;
   }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    #search-bar {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    #goBtn {
+      width: 100%;
+    }
+  }
 </style>
 </head>
 <body>
 
-<div id="navbar">
-  <input type="text" id="urlInput" placeholder="Enter full URL (e.g. www.example.com/page)" />
+<header>Proxy Page Loader</header>
+
+<div id="search-bar">
+  <input
+    type="text"
+    id="urlInput"
+    placeholder="Enter full URL (e.g. https://example.com/page)"
+    autocomplete="off"
+    spellcheck="false"
+  />
   <button id="goBtn">Go</button>
 </div>
 
-<div id="content">
-  <iframe id="frame" src=""></iframe>
+<div id="frame-container">
+  <iframe id="frame" src="" title="Loaded Page"></iframe>
 </div>
 
 <script>
@@ -48,29 +113,43 @@
   const goBtn = document.getElementById('goBtn');
   const frame = document.getElementById('frame');
 
-  function loadURL(url) {
+  function normalizeUrl(url) {
     url = url.trim();
-    if (!url) return;
-
-    // Add https:// if missing
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (!url) return '';
+    // If no protocol, add https://
+    if (!/^https?:\/\//i.test(url)) {
       url = 'https://' + url;
     }
+    return url;
+  }
 
-    // Build proxy function URL to load in iframe
+  function loadUrlInFrame(url) {
+    if (!url) return;
+    // Build proxied URL
     const proxyUrl = '/.netlify/functions/proxy?url=' + encodeURIComponent(url);
     frame.src = proxyUrl;
   }
 
+  // Button click event
   goBtn.addEventListener('click', () => {
-    loadURL(urlInput.value);
+    const url = normalizeUrl(urlInput.value);
+    if (!url) {
+      alert('Please enter a valid URL');
+      return;
+    }
+    loadUrlInFrame(url);
   });
 
-  urlInput.addEventListener('keydown', (e) => {
+  // Enter key in input triggers load
+  urlInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
-      loadURL(urlInput.value);
+      e.preventDefault();
+      goBtn.click();
     }
   });
+
+  // Optional: load default page on startup
+  // loadUrlInFrame('https://www.geeksforgeeks.org/software-engineering/functional-vs-non-functional-requirements/');
 </script>
 
 </body>
