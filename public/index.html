@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WOW Proxy</title>
+  <title>Web Viewer</title>
   <style>
     /* Reset */
     * {
@@ -137,23 +137,6 @@
       border-top: 2px solid #3949ab;
     }
 
-    /* Style for proxied links */
-    iframe {
-      width: 100%;
-      height: 100%;
-    }
-
-    /* Add these styles to the iframe content through proxy.js */
-    .proxied-link {
-      cursor: pointer;
-      transition: color 0.2s ease;
-    }
-
-    .proxied-link:hover {
-      text-decoration: underline;
-      color: #3f51b5 !important;
-    }
-
     iframe {
       width: 100%;
       height: 100%;
@@ -186,14 +169,12 @@
 
 <body>
   <header>
-    <div class="title">WOW Proxy</div>
+    <div class="title">Web Viewer</div>
     <nav id="nav-bar" aria-label="Browser navigation">
-      <button id="backBtn" disabled title="Back">&larr;</button>
-      <button id="forwardBtn" disabled title="Forward">&rarr;</button>
       <button id="reloadBtn" title="Reload">&#x21bb;</button>
       <button id="homeBtn" title="Home">🏠</button>
-      <input type="text" id="urlInput" placeholder="Enter full URL (e.g. https://example.com/page)" autocomplete="off"
-        spellcheck="false" aria-label="URL input" />
+      <input type="text" id="urlInput" placeholder="Enter URL (e.g. example.com)" autocomplete="off" spellcheck="false"
+        aria-label="URL input" />
       <button id="goBtn" title="Go">Go</button>
       <form id="googleSearchForm" role="search" aria-label="Google Search">
         <input type="text" id="googleSearchInput" placeholder="Google Search" autocomplete="off" spellcheck="false"
@@ -220,10 +201,6 @@
 
     const HOME_URL = 'https://www.google.com';
 
-    // History stack management for iframe navigation
-    let historyStack = [];
-    let currentIndex = -1;
-
     // Normalize URL (add https if missing)
     function normalizeUrl(url) {
       url = url.trim();
@@ -234,55 +211,13 @@
       return url;
     }
 
-    // Build proxied URL for iframe src
-    function proxiedUrl(url) {
-      // Ensure URL is properly formatted
-      try {
-        const parsedUrl = new URL(url);
-        // Make sure we're using https where possible
-        if (parsedUrl.protocol === 'http:') {
-          parsedUrl.protocol = 'https:';
-        }
-        return '/.netlify/functions/proxy?url=' + encodeURIComponent(parsedUrl.toString());
-      } catch (e) {
-        console.error('Invalid URL:', url);
-        return '/.netlify/functions/proxy?url=' + encodeURIComponent('https://www.google.com');
-      }
-    }
-
-    // Load URL in iframe and update history
-    // Handle links clicked within the proxy
-    window.handleProxiedLink = function (element) {
-      const originalUrl = element.getAttribute('data-original-url');
-      if (originalUrl) {
-        loadUrl(originalUrl, true);
-      }
-      return false; // Prevent default link behavior
-    };
-
-    function loadUrl(url, pushHistory = true) {
+    // Load URL in iframe
+    function loadUrl(url) {
       if (!url) return;
       const normUrl = normalizeUrl(url);
-
-      if (pushHistory) {
-        // If navigating forward after going back, discard forward history
-        historyStack = historyStack.slice(0, currentIndex + 1);
-        historyStack.push(normUrl);
-        currentIndex++;
-      }
-
-      frame.src = proxiedUrl(normUrl);
+      frame.src = normUrl;
       urlInput.value = normUrl;
-      updateNavButtons();
     }
-
-    // Update state of navigation buttons
-    function updateNavButtons() {
-      backBtn.disabled = currentIndex <= 0;
-      forwardBtn.disabled = currentIndex >= historyStack.length - 1;
-    }
-
-    // Event handlers
 
     // Go button or Enter in URL input
     goBtn.addEventListener('click', () => {
@@ -291,8 +226,9 @@
         alert('Please enter a valid URL');
         return;
       }
-      loadUrl(url, true);
+      loadUrl(url);
     });
+
     urlInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -300,39 +236,17 @@
       }
     });
 
-    // Back
-    backBtn.addEventListener('click', () => {
-      if (currentIndex > 0) {
-        currentIndex--;
-        frame.src = proxiedUrl(historyStack[currentIndex]);
-        urlInput.value = historyStack[currentIndex];
-        updateNavButtons();
-      }
-    });
-
-    // Forward
-    forwardBtn.addEventListener('click', () => {
-      if (currentIndex < historyStack.length - 1) {
-        currentIndex++;
-        frame.src = proxiedUrl(historyStack[currentIndex]);
-        urlInput.value = historyStack[currentIndex];
-        updateNavButtons();
-      }
-    });
-
     // Reload
     reloadBtn.addEventListener('click', () => {
-      if (currentIndex >= 0) {
-        frame.src = proxiedUrl(historyStack[currentIndex]);
-      }
+      frame.src = frame.src;
     });
 
     // Home
     homeBtn.addEventListener('click', () => {
-      loadUrl(HOME_URL, true);
+      loadUrl(HOME_URL);
     });
 
-    // Google Search submit with enhanced functionality
+    // Google Search
     googleSearchForm.addEventListener('submit', e => {
       e.preventDefault();
       const query = googleSearchInput.value.trim();
@@ -340,18 +254,20 @@
 
       // Check if it's a URL first
       if (query.includes('.') && !query.includes(' ')) {
-        loadUrl(query, true);
+        loadUrl(query);
       } else {
         // If not a URL, perform Google search
         const googleUrl = new URL('https://www.google.com/search');
         googleUrl.searchParams.set('q', query);
         googleUrl.searchParams.set('hl', 'en');
         googleUrl.searchParams.set('safe', 'active');
-        loadUrl(googleUrl.toString(), true);
+        loadUrl(googleUrl.toString());
       }
       googleSearchInput.value = '';
-    });    // Initialize with home page
-    loadUrl(HOME_URL, true);
+    });
+
+    // Initialize with home page
+    loadUrl(HOME_URL);
 
   </script>
 </body>
