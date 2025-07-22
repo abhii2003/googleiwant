@@ -1,27 +1,77 @@
+const fetch = require('node-fetch');
 const cheerio = require('cheerio');
 
-exports.handler = async function(event) {
+exports.handler = async (event) => {
   const url = event.queryStringParameters.url;
-  if (!url) return { statusCode: 400, body: 'Missing url' };
+  if (!url) {
+    return { statusCode: 400, body: 'Missing url parameter' };
+  }
 
-  const response = await fetch(url);
-  let html = await response.text();
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
 
-  const $ = cheerio.load(html);
+    // Get content type
+    const contentType = response.headers.get('content-type') || '';
 
-  // Rewrite all src and href URLs to go through proxy
-  $('script[src], link[href], img[src]').each((i, el) => {
-    const attr = el.tagName === 'link' ? 'href' : 'src';
-    let val = $(el).attr(attr);
-    if (val && val.startsWith('http')) {
-      $(el).attr(attr, `/.netlify/functions/proxy?url=${encodeURIComponent(val)}`);
+    // For HTML, rewrite resource URLs
+    if (contentType.includes('text/html')) {
+      const body = await response.text();
+
+      const $ = cheerio.load(body);
+
+      // Rewrite src, href URLs to proxy URLs
+      $('script[src], link[href], img[src], iframe[src]').each((_, el) => {
+        const attr = el.tagName === 'link' ? 'href' : 'src';
+        let val = $(el).attr(attr);
+
+        if (val && (val.startsWith('http') || val.startsWith('//'))) {
+          // Fix protocol-relative URLs
+          if (val.startsWith('//')) val = 'https:' + val;
+
+          const proxiedUrl = '/.netlify/functions/proxy?url=' + encodeURIComponent(val);
+          $(el).attr(attr, proxiedUrl);
+        }
+      });
+
+      // You can add more selectors if needed (e.g. CSS url(), AJAX calls, etc.)
+
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'text/html',
+          // Remove frame blocking headers from original site:
+          'X-Frame-Options': 'ALLOWALL',
+          'Content-Security-Policy': "frame-ancestors * 'self' data: blob:;",
+        },
+        body: $.html()
+      };
+
+    } else {
+      // For non-HTML (images, CSS, JS), just stream the response
+
+      const buffer = await response.buffer();
+
+      // Get content length if any
+      const contentLength = response.headers.get('content-length');
+
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': contentType,
+          ...(contentLength ? { 'Content-Length': contentLength } : {}),
+          'Cache-Control': 'public, max-age=3600'
+        },
+        body: buffer.toString('base64'),
+        isBase64Encoded: true,
+      };
     }
-  });
 
-  // Return modified HTML
-  return {
-    statusCode: 200,
-    headers: { 'Content-Type': 'text/html' },
-    body: $.html()
-  };
+  } catch (err) {
+    return {
+      statusCode: 500,
+      body: 'Error: ' + err.message,
+    };
+  }
 };
