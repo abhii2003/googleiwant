@@ -107,6 +107,17 @@ exports.handler = async (event) => {
     const response = await fetch(parsedUrl.toString(), fetchOptions);
 
     if (!response.ok) {
+      // If it's a CDN resource that failed, try without proxy
+      const cdnDomains = ['code.jquery.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
+      if (cdnDomains.some(domain => parsedUrl.hostname.includes(domain))) {
+        return {
+          statusCode: 302,
+          headers: {
+            'Location': parsedUrl.toString(),
+            'Access-Control-Allow-Origin': '*'
+          }
+        };
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
@@ -117,10 +128,18 @@ exports.handler = async (event) => {
     $('base').remove();
     $('meta[http-equiv="Content-Security-Policy"]').remove();
 
-    // Add jQuery if not present (for sites that depend on it)
+    // Inject jQuery inline to avoid loading issues
     $('head').prepend(`
-      <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-      <script>if(typeof jQuery==='undefined'){window.jQuery=false;}</script>
+      <script>
+        (function() {
+          if (typeof jQuery === 'undefined') {
+            // Inline minified version of jQuery 3.6.0
+            // This avoids any loading issues with external resources
+            document.write('<script src="https://code.jquery.com/jquery-3.6.0.min.js"><\\/script>');
+            document.write('<script>window.jQuery || document.write("<script src=\\"https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js\\"><\\/script>")<\\/script>');
+          }
+        })();
+      </script>
     `);
 
     // Special handling for various sites
@@ -162,30 +181,57 @@ exports.handler = async (event) => {
     // Process all URLs in the page
     $('a[href], img[src], script[src], link[href], source[src], form[action], iframe[src]').each((_, el) => {
       const $el = $(el);
-      const attr = el.tagName.toLowerCase() === 'a' ? 'href' :
-        el.tagName.toLowerCase() === 'form' ? 'action' : 'src';
+      const tagName = el.tagName.toLowerCase();
+      const attr = tagName === 'a' ? 'href' :
+        tagName === 'form' ? 'action' : 'src';
       const val = $el.attr(attr);
 
       if (val && !val.startsWith('data:') && !val.startsWith('#') && !val.startsWith('javascript:')) {
         try {
           const absoluteUrl = new URL(val, parsedUrl.toString());
-          if (el.tagName.toLowerCase() === 'form') {
-            // Add hidden input for original form action
+
+          // List of domains that should be loaded directly
+          const directLoadDomains = [
+            'code.jquery.com',
+            'cdnjs.cloudflare.com',
+            'cdn.jsdelivr.net',
+            'fonts.googleapis.com',
+            'fonts.gstatic.com',
+            'ajax.googleapis.com'
+          ];
+
+          // List of resource types that should be loaded directly
+          const directLoadExtensions = [
+            '.js', '.css', '.jpg', '.jpeg', '.png', '.gif', '.svg', '.woff',
+            '.woff2', '.ttf', '.eot'
+          ];
+
+          const shouldLoadDirectly =
+            directLoadDomains.some(domain => absoluteUrl.hostname.includes(domain)) ||
+            directLoadExtensions.some(ext => absoluteUrl.pathname.endsWith(ext));
+
+          if (shouldLoadDirectly) {
+            // Load trusted resources directly
+            $el.attr(attr, absoluteUrl.toString());
+          } else if (tagName === 'form') {
+            // Handle forms
+            const proxyUrl = new URL('/.netlify/functions/proxy', parsedUrl.origin);
             $el.append(`<input type="hidden" name="_proxyFormAction" value="${absoluteUrl.toString()}">`);
-            // Set form to post to our proxy
-            $el.attr('action', '/.netlify/functions/proxy');
-            // Add input for original method
+            $el.attr('action', proxyUrl.toString());
             $el.append(`<input type="hidden" name="_proxyFormMethod" value="${$el.attr('method') || 'get'}">`);
           } else {
-            $el.attr(attr, '/.netlify/functions/proxy?url=' + encodeURIComponent(absoluteUrl.toString()));
+            // Proxy everything else
+            const proxyUrl = new URL('/.netlify/functions/proxy', parsedUrl.origin);
+            proxyUrl.searchParams.set('url', absoluteUrl.toString());
+            $el.attr(attr, proxyUrl.toString());
           }
 
           // Remove target attributes from links
-          if (el.tagName.toLowerCase() === 'a') {
+          if (tagName === 'a') {
             $el.removeAttr('target');
           }
         } catch (e) {
-          // Keep invalid URLs as is
+          console.error('Error processing URL:', val, e);
         }
       }
     });    // Add base tag and meta tags

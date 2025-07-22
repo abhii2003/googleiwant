@@ -217,7 +217,9 @@
     function loadUrl(url) {
       if (!url) return;
       const normUrl = normalizeUrl(url);
-      frame.src = '/.netlify/functions/proxy?url=' + encodeURIComponent(normUrl);
+      const proxyUrl = new URL('/.netlify/functions/proxy', window.location.origin);
+      proxyUrl.searchParams.set('url', normUrl);
+      frame.src = proxyUrl.toString();
       urlInput.value = normUrl;
     }
 
