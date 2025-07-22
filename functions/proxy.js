@@ -2,17 +2,23 @@ const fetch = require('node-fetch');
 const cheerio = require('cheerio');
 
 exports.handler = async (event) => {
+  const debug = false;
+
   try {
+    // Get and validate URL
     const url = event.queryStringParameters?.url;
     if (!url) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Missing url parameter' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ error: 'Missing url parameter' })
       };
     }
 
-    // Validate and normalize URL
+    // Parse and normalize URL
     let parsedUrl;
     try {
       parsedUrl = new URL(url);
@@ -22,8 +28,11 @@ exports.handler = async (event) => {
     } catch (e) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Invalid URL format' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ error: 'Invalid URL format' })
       };
     }
 
@@ -33,14 +42,19 @@ exports.handler = async (event) => {
       parsedUrl.searchParams.set('safe', 'active');
     }
 
+    if (debug) console.log('Fetching URL:', parsedUrl.toString());
+
+    // Fetch the content with proper headers
     const response = await fetch(parsedUrl.toString(), {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
-      }
+      },
+      redirect: 'follow'
     });
 
     if (!response.ok) {
@@ -48,58 +62,85 @@ exports.handler = async (event) => {
     }
 
     const contentType = response.headers.get('content-type') || '';
+    if (debug) console.log('Content-Type:', contentType);
 
-    if (contentType.includes('text/html')) {
+    // Handle different content types
+    if (contentType.toLowerCase().includes('text/html')) {
       const html = await response.text();
-      const $ = cheerio.load(html);
+      const $ = cheerio.load(html, {
+        decodeEntities: true,
+        xmlMode: false
+      });
 
-      // For Google search results
+      // Special handling for Google search results
       if (parsedUrl.hostname.includes('google.com') && parsedUrl.pathname.includes('/search')) {
-        // Remove unnecessary elements
+        // Remove unnecessary elements but keep essential structure
         $('#searchform, #gb, .gb_g, .gb_h, .gb_i').remove();
         $('#top_nav, #appbar, #hdtb').remove();
         $('#bottomads, #footcnt').remove();
+        $('#consent-bump, #atvcap, .fbar').remove();
+        $('style:contains("gb_")').remove();
 
-        // Keep only search results
-        const searchResults = $('#main');
-        if (searchResults.length) {
-          $('body').empty().append(searchResults);
+        // Keep only the main content
+        const mainContent = $('#main, #search, #center_col');
+        if (mainContent.length) {
+          $('body').children().not(mainContent).remove();
         }
       }
 
       // Process all URLs in the page
-      $('a[href], img[src], script[src], link[href]').each((_, el) => {
+      $('a[href], img[src], script[src], link[href], form[action]').each((_, el) => {
         const $el = $(el);
-        const attr = el.tagName === 'a' ? 'href' : 'src';
-        let val = $el.attr(attr);
+        const attr = el.tagName.toLowerCase() === 'a' ? 'href' :
+          el.tagName.toLowerCase() === 'form' ? 'action' : 'src';
+        const val = $el.attr(attr);
 
-        if (val && !val.startsWith('data:')) {
+        if (val && !val.startsWith('data:') && !val.startsWith('#')) {
           try {
-            const absoluteUrl = new URL(val, parsedUrl.toString()).toString();
-            $el.attr(attr, '/.netlify/functions/proxy?url=' + encodeURIComponent(absoluteUrl));
+            const absoluteUrl = new URL(val, parsedUrl.toString());
+            if (el.tagName.toLowerCase() === 'a') {
+              // For anchor tags, keep the original URL as a data attribute
+              $el.attr('data-original-url', absoluteUrl.toString());
+              // Remove target attribute to prevent opening in new tab
+              $el.removeAttr('target');
+              // Add a special class to identify proxied links
+              $el.addClass('proxied-link');
+              // Set onclick attribute to handle the click in the parent window
+              $el.attr('onclick', 'return window.parent.handleProxiedLink(this);');
+            }
+            $el.attr(attr, '/.netlify/functions/proxy?url=' + encodeURIComponent(absoluteUrl.toString()));
           } catch (e) {
-            // Invalid URL, skip it
+            if (debug) console.log('Error processing URL:', val, e);
           }
         }
-      });
+      });      // Add base tag and necessary meta tags
+      $('head').prepend(`
+        <base href="${parsedUrl.toString()}">
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+      `);
 
       return {
         statusCode: 200,
         headers: {
-          'Content-Type': 'text/html',
-          'Cache-Control': 'no-store',
-          'X-Frame-Options': 'ALLOWALL'
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store, must-revalidate',
+          'X-Frame-Options': 'ALLOWALL',
+          'Content-Security-Policy': "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors *",
+          'Access-Control-Allow-Origin': '*'
         },
         body: $.html()
       };
     } else {
-      // For non-HTML content
+      // Handle non-HTML content (images, scripts, styles, etc.)
       const buffer = await response.buffer();
+
       return {
         statusCode: 200,
         headers: {
           'Content-Type': contentType,
-          'Cache-Control': 'public, max-age=3600'
+          'Cache-Control': 'public, max-age=3600',
+          'Access-Control-Allow-Origin': '*'
         },
         body: buffer.toString('base64'),
         isBase64Encoded: true
@@ -108,104 +149,15 @@ exports.handler = async (event) => {
   } catch (error) {
     console.error('Proxy error:', error);
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' }),
-      headers: { 'Content-Type': 'application/json' }
+      statusCode: 502,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({
+        error: 'Bad Gateway',
+        message: error.message
+      })
     };
   }
-};
-
-try {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'Accept-Encoding': 'gzip, deflate, br'
-    }
-  }); const contentType = response.headers.get('content-type') || '';
-
-  if (contentType.includes('text/html')) {
-    const body = await response.text();
-    const $ = cheerio.load(body);
-
-    // Check if this is a Google search page
-    const isGoogleSearch = url.includes('google.com/search');
-
-    if (isGoogleSearch) {
-      // Remove Google's UI elements but keep search results
-      $('#searchform, #top_nav, #appbar, #hdtb, .gb_g, .gb_h, .gb_i, #footer, #bottomads').remove();
-      $('#slim_appbar, #lb, .pdp-psy').remove();
-      $('#consent-bump, #atvcap, .fbar').remove();
-      $('style:contains("gb_")').remove();
-
-      // Keep only the main search results
-      const mainContent = $('#main');
-      if (mainContent.length) {
-        $('body').empty().append(mainContent);
-      }
-    } else {
-      // For non-Google pages, remove navigation elements
-      $('nav, header').remove();
-    }
-
-    // Enhanced URL rewriting for all resources
-    $('script[src], link[href], img[src], iframe[src], a[href], form[action]').each((_, el) => {
-      const $el = $(el);
-      const attr = el.tagName === 'link' ? 'href' :
-        el.tagName === 'form' ? 'action' :
-          'src';
-      let val = $el.attr(attr);
-
-      if (val) {
-        // Handle relative URLs
-        if (val.startsWith('/')) {
-          const baseUrl = new URL(url);
-          val = `${baseUrl.protocol}//${baseUrl.host}${val}`;
-        } else if (val.startsWith('//')) {
-          val = 'https:' + val;
-        } else if (!val.startsWith('http') && !val.startsWith('data:') && !val.startsWith('#')) {
-          const baseUrl = new URL(url);
-          val = `${baseUrl.protocol}//${baseUrl.host}/${val}`;
-        }
-
-        // Only proxy non-data and non-anchor URLs
-        if (val.startsWith('http')) {
-          const proxiedUrl = '/.netlify/functions/proxy?url=' + encodeURIComponent(val);
-          $el.attr(attr, proxiedUrl);
-        }
-      }
-    });
-
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'text/html',
-        'X-Frame-Options': 'ALLOWALL',
-        'Content-Security-Policy': "frame-ancestors * 'self' data: blob:;",
-      },
-      body: $.html()
-    };
-
-  } else {
-    // Non-HTML (images, CSS, JS), stream raw content
-    const buffer = await response.buffer();
-    const contentLength = response.headers.get('content-length');
-
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': contentType,
-        ...(contentLength ? { 'Content-Length': contentLength } : {}),
-        'Cache-Control': 'public, max-age=3600'
-      },
-      body: buffer.toString('base64'),
-      isBase64Encoded: true,
-    };
-  }
-} catch (err) {
-  return {
-    statusCode: 500,
-    body: 'Error: ' + err.message,
-  };
 };
