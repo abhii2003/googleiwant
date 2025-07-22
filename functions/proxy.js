@@ -1,45 +1,27 @@
-exports.handler = async function(event, context) {
+const cheerio = require('cheerio');
+
+exports.handler = async function(event) {
   const url = event.queryStringParameters.url;
+  if (!url) return { statusCode: 400, body: 'Missing url' };
 
-  if (!url) {
-    return {
-      statusCode: 400,
-      body: 'Missing url parameter'
-    };
-  }
+  const response = await fetch(url);
+  let html = await response.text();
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible)'
-      }
-    });
+  const $ = cheerio.load(html);
 
-    const body = await response.text();
+  // Rewrite all src and href URLs to go through proxy
+  $('script[src], link[href], img[src]').each((i, el) => {
+    const attr = el.tagName === 'link' ? 'href' : 'src';
+    let val = $(el).attr(attr);
+    if (val && val.startsWith('http')) {
+      $(el).attr(attr, `/.netlify/functions/proxy?url=${encodeURIComponent(val)}`);
+    }
+  });
 
-    const headers = {};
-    response.headers.forEach((value, key) => {
-      const lowerKey = key.toLowerCase();
-      if (lowerKey !== 'x-frame-options' 
-          && lowerKey !== 'content-security-policy'
-          && lowerKey !== 'content-encoding') { // remove this header
-        headers[key] = value;
-      }
-    });
-
-    return {
-      statusCode: 200,
-      headers: {
-        ...headers,
-        'Content-Type': response.headers.get('content-type') || 'text/html',
-      },
-      body
-    };
-
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: 'Error fetching URL: ' + error.message
-    };
-  }
+  // Return modified HTML
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'text/html' },
+    body: $.html()
+  };
 };
