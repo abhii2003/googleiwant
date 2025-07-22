@@ -4,7 +4,14 @@ const cheerio = require('cheerio');
 exports.handler = async (event) => {
   const url = event.queryStringParameters.url;
   if (!url) {
-    return { statusCode: 400, body: 'Missing url parameter' };
+    return { statusCode: 400, body: JSON.stringify({ error: 'Missing url parameter' }) };
+  }
+
+  // Validate URL format
+  try {
+    new URL(url);
+  } catch (e) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid URL format' }) };
   }
 
   try {
@@ -22,22 +29,39 @@ exports.handler = async (event) => {
       // Remove <nav>, <header>, and common Google nav classes/ids
       $('nav, header, div#top_nav, div#hdtb, div[jsname="K32k3e"]').remove();
 
-      // Sometimes Google wraps nav inside <div> with specific classes, try these as well
+      // Enhanced removal of Google navigation elements
       $('[role="navigation"]').remove();
-      $('.gb_g').remove();         // Google account bar
-      $('.hdtb-mitem').remove();   // Top menu items
-      $('#gb').remove();           // Google bar container
+      $('.gb_g, .gb_h, .gb_i').remove();  // Google account and related bars
+      $('.hdtb-mitem').remove();          // Top menu items
+      $('#gb, #gbar, #guser').remove();   // Google bar containers
+      $('#searchform').closest('div[style*="position: relative"]').remove(); // Search form container
+      $('style:contains("gb_")').remove(); // Remove Google-specific styles
 
-      // Rewrite resource URLs (script[src], link[href], img[src], iframe[src])
-      $('script[src], link[href], img[src], iframe[src]').each((_, el) => {
-        const attr = el.tagName === 'link' ? 'href' : 'src';
-        let val = $(el).attr(attr);
+      // Enhanced URL rewriting for all resources
+      $('script[src], link[href], img[src], iframe[src], a[href], form[action]').each((_, el) => {
+        const $el = $(el);
+        const attr = el.tagName === 'link' ? 'href' :
+          el.tagName === 'form' ? 'action' :
+            'src';
+        let val = $el.attr(attr);
 
-        if (val && (val.startsWith('http') || val.startsWith('//'))) {
-          if (val.startsWith('//')) val = 'https:' + val;
+        if (val) {
+          // Handle relative URLs
+          if (val.startsWith('/')) {
+            const baseUrl = new URL(url);
+            val = `${baseUrl.protocol}//${baseUrl.host}${val}`;
+          } else if (val.startsWith('//')) {
+            val = 'https:' + val;
+          } else if (!val.startsWith('http') && !val.startsWith('data:') && !val.startsWith('#')) {
+            const baseUrl = new URL(url);
+            val = `${baseUrl.protocol}//${baseUrl.host}/${val}`;
+          }
 
-          const proxiedUrl = '/.netlify/functions/proxy?url=' + encodeURIComponent(val);
-          $(el).attr(attr, proxiedUrl);
+          // Only proxy non-data and non-anchor URLs
+          if (val.startsWith('http')) {
+            const proxiedUrl = '/.netlify/functions/proxy?url=' + encodeURIComponent(val);
+            $el.attr(attr, proxiedUrl);
+          }
         }
       });
 
