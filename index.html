@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini Browser with URL Routing</title>
+  <style>
+    body, html {
+      margin: 0; padding: 0; height: 100%;
+      font-family: Arial, sans-serif;
+    }
+    #navbar {
+      padding: 10px;
+      background: #eee;
+    }
+    #content {
+      height: calc(100vh - 50px);
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="navbar">
+    <input type="text" id="urlInput" style="width: 80%;" placeholder="Enter URL or search query" />
+    <button id="goBtn">Go</button>
+  </div>
+  <div id="content">
+    <iframe id="frame" src=""></iframe>
+  </div>
+
+  <script>
+    const urlInput = document.getElementById('urlInput');
+    const goBtn = document.getElementById('goBtn');
+    const frame = document.getElementById('frame');
+
+    function loadURL(url) {
+      // Simple check to add https if missing
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      frame.src = url;
+      // Change URL path without reload
+      history.pushState({url: url}, '', '/view?url=' + encodeURIComponent(url));
+      urlInput.value = url;
+    }
+
+    goBtn.addEventListener('click', () => {
+      const val = urlInput.value.trim();
+      if (val) {
+        loadURL(val);
+      }
+    });
+
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        goBtn.click();
+      }
+    });
+
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', (event) => {
+      if (event.state && event.state.url) {
+        frame.src = event.state.url;
+        urlInput.value = event.state.url;
+      }
+    });
+
+    // On page load, check URL query param and load it
+    window.onload = () => {
+      const params = new URLSearchParams(window.location.search);
+      const url = params.get('url');
+      if (url) {
+        frame.src = url;
+        urlInput.value = url;
+        // Save state for back/forward
+        history.replaceState({url: url}, '', window.location.href);
+      }
+    };
+  </script>
+</body>
+</html>
