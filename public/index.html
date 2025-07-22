@@ -1,13 +1,77 @@
-function loadURL(url) {
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    url = 'https://' + url;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simple URL Loader</title>
+<style>
+  body, html {
+    margin: 0; padding: 0; height: 100%;
+    font-family: Arial, sans-serif;
   }
-  // Instead of loading URL directly in iframe,
-  // load it through your Netlify proxy function
-  const proxyUrl = '/.netlify/functions/proxy?url=' + encodeURIComponent(url);
+  #navbar {
+    padding: 10px;
+    background: #eee;
+  }
+  #urlInput {
+    width: 80%;
+    font-size: 16px;
+    padding: 6px 8px;
+  }
+  #goBtn {
+    font-size: 16px;
+    padding: 6px 12px;
+  }
+  #content {
+    height: calc(100vh - 50px);
+  }
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+</style>
+</head>
+<body>
 
-  frame.src = proxyUrl;
-  urlInput.value = url;
+<div id="navbar">
+  <input type="text" id="urlInput" placeholder="Enter full URL (e.g. www.example.com/page)" />
+  <button id="goBtn">Go</button>
+</div>
 
-  history.pushState({url: url}, '', '/view?url=' + encodeURIComponent(url));
-}
+<div id="content">
+  <iframe id="frame" src=""></iframe>
+</div>
+
+<script>
+  const urlInput = document.getElementById('urlInput');
+  const goBtn = document.getElementById('goBtn');
+  const frame = document.getElementById('frame');
+
+  function loadURL(url) {
+    url = url.trim();
+    if (!url) return;
+
+    // Add https:// if missing
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+
+    // Build proxy function URL to load in iframe
+    const proxyUrl = '/.netlify/functions/proxy?url=' + encodeURIComponent(url);
+    frame.src = proxyUrl;
+  }
+
+  goBtn.addEventListener('click', () => {
+    loadURL(urlInput.value);
+  });
+
+  urlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      loadURL(urlInput.value);
+    }
+  });
+</script>
+
+</body>
+</html>
