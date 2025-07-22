@@ -12,22 +12,28 @@ exports.handler = async (event) => {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
 
-    // Get content type
     const contentType = response.headers.get('content-type') || '';
 
-    // For HTML, rewrite resource URLs
     if (contentType.includes('text/html')) {
       const body = await response.text();
-
       const $ = cheerio.load(body);
 
-      // Rewrite src, href URLs to proxy URLs
+      // Remove Google's navigation elements (best-effort)
+      // Remove <nav>, <header>, and common Google nav classes/ids
+      $('nav, header, div#top_nav, div#hdtb, div[jsname="K32k3e"]').remove();
+
+      // Sometimes Google wraps nav inside <div> with specific classes, try these as well
+      $('[role="navigation"]').remove();
+      $('.gb_g').remove();         // Google account bar
+      $('.hdtb-mitem').remove();   // Top menu items
+      $('#gb').remove();           // Google bar container
+
+      // Rewrite resource URLs (script[src], link[href], img[src], iframe[src])
       $('script[src], link[href], img[src], iframe[src]').each((_, el) => {
         const attr = el.tagName === 'link' ? 'href' : 'src';
         let val = $(el).attr(attr);
 
         if (val && (val.startsWith('http') || val.startsWith('//'))) {
-          // Fix protocol-relative URLs
           if (val.startsWith('//')) val = 'https:' + val;
 
           const proxiedUrl = '/.netlify/functions/proxy?url=' + encodeURIComponent(val);
@@ -35,13 +41,10 @@ exports.handler = async (event) => {
         }
       });
 
-      // You can add more selectors if needed (e.g. CSS url(), AJAX calls, etc.)
-
       return {
         statusCode: 200,
         headers: {
           'Content-Type': 'text/html',
-          // Remove frame blocking headers from original site:
           'X-Frame-Options': 'ALLOWALL',
           'Content-Security-Policy': "frame-ancestors * 'self' data: blob:;",
         },
@@ -49,11 +52,8 @@ exports.handler = async (event) => {
       };
 
     } else {
-      // For non-HTML (images, CSS, JS), just stream the response
-
+      // Non-HTML (images, CSS, JS), stream raw content
       const buffer = await response.buffer();
-
-      // Get content length if any
       const contentLength = response.headers.get('content-length');
 
       return {
@@ -67,7 +67,6 @@ exports.handler = async (event) => {
         isBase64Encoded: true,
       };
     }
-
   } catch (err) {
     return {
       statusCode: 500,
