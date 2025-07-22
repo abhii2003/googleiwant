@@ -219,7 +219,18 @@
 
     // Build proxied URL for iframe src
     function proxiedUrl(url) {
-      return '/.netlify/functions/proxy?url=' + encodeURIComponent(url);
+      // Ensure URL is properly formatted
+      try {
+        const parsedUrl = new URL(url);
+        // Make sure we're using https where possible
+        if (parsedUrl.protocol === 'http:') {
+          parsedUrl.protocol = 'https:';
+        }
+        return '/.netlify/functions/proxy?url=' + encodeURIComponent(parsedUrl.toString());
+      } catch (e) {
+        console.error('Invalid URL:', url);
+        return '/.netlify/functions/proxy?url=' + encodeURIComponent('https://www.google.com');
+      }
     }
 
     // Load URL in iframe and update history
@@ -306,8 +317,11 @@
         loadUrl(query, true);
       } else {
         // If not a URL, perform Google search
-        const googleUrl = `https://www.google.com/search?igu=1&q=${encodeURIComponent(query)}`;
-        loadUrl(googleUrl, true);
+        const googleUrl = new URL('https://www.google.com/search');
+        googleUrl.searchParams.set('q', query);
+        googleUrl.searchParams.set('hl', 'en');
+        googleUrl.searchParams.set('safe', 'active');
+        loadUrl(googleUrl.toString(), true);
       }
       googleSearchInput.value = '';
     });    // Initialize with home page
