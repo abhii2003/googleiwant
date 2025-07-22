@@ -36,6 +36,19 @@ exports.handler = async (event) => {
       };
     }
 
+    // Block certain resource types and analytics
+    if (parsedUrl.pathname.includes('/gen_204') ||
+      parsedUrl.hostname.includes('googleadservices.com') ||
+      parsedUrl.pathname.includes('/pagead/') ||
+      parsedUrl.pathname.includes('/async/')) {
+      return {
+        statusCode: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*'
+        }
+      };
+    }
+
     // Special handling for Google URLs
     if (parsedUrl.hostname.includes('google.com')) {
       parsedUrl.searchParams.set('hl', 'en');
@@ -73,18 +86,37 @@ exports.handler = async (event) => {
       });
 
       // Special handling for Google search results
-      if (parsedUrl.hostname.includes('google.com') && parsedUrl.pathname.includes('/search')) {
-        // Remove unnecessary elements but keep essential structure
-        $('#searchform, #gb, .gb_g, .gb_h, .gb_i').remove();
-        $('#top_nav, #appbar, #hdtb').remove();
-        $('#bottomads, #footcnt').remove();
-        $('#consent-bump, #atvcap, .fbar').remove();
-        $('style:contains("gb_")').remove();
+      if (parsedUrl.hostname.includes('google.com')) {
+        // Remove scripts that might cause CORS issues
+        $('script').each((_, el) => {
+          const src = $(el).attr('src');
+          if (src && (
+            src.includes('google-analytics.com') ||
+            src.includes('/xjs/_/js/') ||
+            src.includes('googleads') ||
+            src.includes('/async/') ||
+            src.includes('/gen_204')
+          )) {
+            $(el).remove();
+          }
+        });
 
-        // Keep only the main content
-        const mainContent = $('#main, #search, #center_col');
-        if (mainContent.length) {
-          $('body').children().not(mainContent).remove();
+        // Remove tracking pixels and unnecessary iframes
+        $('img[src*="gen_204"], iframe[src*="google"]').remove();
+
+        if (parsedUrl.pathname.includes('/search')) {
+          // Remove unnecessary elements but keep essential structure
+          $('#searchform, #gb, .gb_g, .gb_h, .gb_i').remove();
+          $('#top_nav, #appbar, #hdtb').remove();
+          $('#bottomads, #footcnt').remove();
+          $('#consent-bump, #atvcap, .fbar').remove();
+          $('style:contains("gb_")').remove();
+
+          // Keep only the main content
+          const mainContent = $('#main, #search, #center_col');
+          if (mainContent.length) {
+            $('body').children().not(mainContent).remove();
+          }
         }
       }
 
@@ -126,8 +158,12 @@ exports.handler = async (event) => {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-store, must-revalidate',
           'X-Frame-Options': 'ALLOWALL',
-          'Content-Security-Policy': "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors *",
-          'Access-Control-Allow-Origin': '*'
+          'Content-Security-Policy': "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors *; connect-src *; img-src * data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline';",
+          'Access-Control-Allow-Origin': '*',
+          'Cross-Origin-Resource-Policy': 'cross-origin',
+          'Cross-Origin-Embedder-Policy': 'unsafe-none',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': '*'
         },
         body: $.html()
       };
