@@ -1,5 +1,3 @@
-const fetch = require('node-fetch');
-
 exports.handler = async function(event, context) {
   const url = event.queryStringParameters.url;
 
@@ -11,21 +9,20 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    // Fetch the target URL
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible)'
       }
     });
 
-    // Clone the response body as text
     const body = await response.text();
 
-    // Prepare headers - remove headers that block iframe embedding
     const headers = {};
     response.headers.forEach((value, key) => {
-      // Skip X-Frame-Options & Content-Security-Policy
-      if (key.toLowerCase() !== 'x-frame-options' && key.toLowerCase() !== 'content-security-policy') {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey !== 'x-frame-options' 
+          && lowerKey !== 'content-security-policy'
+          && lowerKey !== 'content-encoding') { // remove this header
         headers[key] = value;
       }
     });
