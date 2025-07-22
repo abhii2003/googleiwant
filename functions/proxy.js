@@ -133,10 +133,14 @@ exports.handler = async (event) => {
       <script>
         (function() {
           if (typeof jQuery === 'undefined') {
-            // Inline minified version of jQuery 3.6.0
-            // This avoids any loading issues with external resources
-            document.write('<script src="https://code.jquery.com/jquery-3.6.0.min.js"><\/script>');
-            document.write('<script>window.jQuery || document.write(\'<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"><\/script>\')<\/script>');
+            var script = document.createElement('script');
+            script.src = 'https://code.jquery.com/jquery-3.6.0.min.js';
+            script.onerror = function() {
+              var fallback = document.createElement('script');
+              fallback.src = 'https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js';
+              document.head.appendChild(fallback);
+            };
+            document.head.appendChild(script);
           }
         })();
       </script>
