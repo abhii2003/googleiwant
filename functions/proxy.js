@@ -3,8 +3,31 @@ const cheerio = require('cheerio');
 
 exports.handler = async (event) => {
   try {
-    // Get and validate URL
-    const url = event.queryStringParameters?.url;
+    let url;
+    let method = 'GET';
+    let formData = null;
+
+    // Handle form submissions
+    if (event.httpMethod === 'POST' && event.headers['content-type']?.includes('application/x-www-form-urlencoded')) {
+      const params = new URLSearchParams(event.body);
+      const formAction = params.get('_proxyFormAction');
+      const formMethod = params.get('_proxyFormMethod');
+
+      if (formAction) {
+        url = formAction;
+        method = formMethod || 'GET';
+        // Remove our special fields
+        params.delete('_proxyFormAction');
+        params.delete('_proxyFormMethod');
+        formData = params;
+      }
+    }
+
+    // If not a form submission, get URL from query params
+    if (!url) {
+      url = event.queryStringParameters?.url;
+    }
+
     if (!url) {
       return {
         statusCode: 400,
@@ -35,7 +58,8 @@ exports.handler = async (event) => {
     }
 
     // Fetch the content with realistic browser headers
-    const response = await fetch(parsedUrl.toString(), {
+    const fetchOptions = {
+      method: method,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -53,7 +77,22 @@ exports.handler = async (event) => {
         'Pragma': 'no-cache'
       },
       redirect: 'follow'
-    });
+    };
+
+    // Add form data if present
+    if (formData) {
+      if (method.toUpperCase() === 'GET') {
+        // For GET requests, append form data to URL
+        const searchParams = new URLSearchParams(formData);
+        parsedUrl.search = searchParams.toString();
+      } else {
+        // For POST requests, add form data to body
+        fetchOptions.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+        fetchOptions.body = formData.toString();
+      }
+    }
+
+    const response = await fetch(parsedUrl.toString(), fetchOptions);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -66,6 +105,25 @@ exports.handler = async (event) => {
     $('base').remove();
     $('meta[http-equiv="Content-Security-Policy"]').remove();
 
+    // Special handling for Google
+    if (parsedUrl.hostname.includes('google.com')) {
+      // Remove elements that might cause issues
+      $('script[src*="xjs/_/js/"]').remove();
+      $('script[nonce]').remove();
+      $('link[rel="preload"]').remove();
+      $('script:contains("google.sn =")').remove();
+      $('script:contains("google.pmc =")').remove();
+
+      // Clean up forms
+      $('form').each((_, form) => {
+        const $form = $(form);
+        // Remove onsubmit handlers
+        $form.removeAttr('onsubmit');
+        // Add our own target
+        $form.attr('target', '_self');
+      });
+    }
+
     // Process all URLs in the page
     $('a[href], img[src], script[src], link[href], source[src], form[action], iframe[src]').each((_, el) => {
       const $el = $(el);
@@ -76,7 +134,16 @@ exports.handler = async (event) => {
       if (val && !val.startsWith('data:') && !val.startsWith('#') && !val.startsWith('javascript:')) {
         try {
           const absoluteUrl = new URL(val, parsedUrl.toString());
-          $el.attr(attr, '/.netlify/functions/proxy?url=' + encodeURIComponent(absoluteUrl.toString()));
+          if (el.tagName.toLowerCase() === 'form') {
+            // Add hidden input for original form action
+            $el.append(`<input type="hidden" name="_proxyFormAction" value="${absoluteUrl.toString()}">`);
+            // Set form to post to our proxy
+            $el.attr('action', '/.netlify/functions/proxy');
+            // Add input for original method
+            $el.append(`<input type="hidden" name="_proxyFormMethod" value="${$el.attr('method') || 'get'}">`);
+          } else {
+            $el.attr(attr, '/.netlify/functions/proxy?url=' + encodeURIComponent(absoluteUrl.toString()));
+          }
 
           // Remove target attributes from links
           if (el.tagName.toLowerCase() === 'a') {
@@ -86,9 +153,7 @@ exports.handler = async (event) => {
           // Keep invalid URLs as is
         }
       }
-    });
-
-    // Add base tag and meta tags
+    });    // Add base tag and meta tags
     $('head').prepend(`
       <base href="${parsedUrl.toString()}">
       <meta charset="utf-8">
