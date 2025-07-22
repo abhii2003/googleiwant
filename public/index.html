@@ -211,11 +211,11 @@
       return url;
     }
 
-    // Load URL in iframe
+    // Load URL in iframe through proxy
     function loadUrl(url) {
       if (!url) return;
       const normUrl = normalizeUrl(url);
-      frame.src = normUrl;
+      frame.src = '/.netlify/functions/proxy?url=' + encodeURIComponent(normUrl);
       urlInput.value = normUrl;
     }
 
