@@ -16,26 +16,37 @@ exports.handler = async (event) => {
 
   try {
     const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
-
-    const contentType = response.headers.get('content-type') || '';
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br'
+      }
+    }); const contentType = response.headers.get('content-type') || '';
 
     if (contentType.includes('text/html')) {
       const body = await response.text();
       const $ = cheerio.load(body);
 
-      // Remove Google's navigation elements (best-effort)
-      // Remove <nav>, <header>, and common Google nav classes/ids
-      $('nav, header, div#top_nav, div#hdtb, div[jsname="K32k3e"]').remove();
+      // Check if this is a Google search page
+      const isGoogleSearch = url.includes('google.com/search');
 
-      // Enhanced removal of Google navigation elements
-      $('[role="navigation"]').remove();
-      $('.gb_g, .gb_h, .gb_i').remove();  // Google account and related bars
-      $('.hdtb-mitem').remove();          // Top menu items
-      $('#gb, #gbar, #guser').remove();   // Google bar containers
-      $('#searchform').closest('div[style*="position: relative"]').remove(); // Search form container
-      $('style:contains("gb_")').remove(); // Remove Google-specific styles
+      if (isGoogleSearch) {
+        // Remove Google's UI elements but keep search results
+        $('#searchform, #top_nav, #appbar, #hdtb, .gb_g, .gb_h, .gb_i, #footer, #bottomads').remove();
+        $('#slim_appbar, #lb, .pdp-psy').remove();
+        $('#consent-bump, #atvcap, .fbar').remove();
+        $('style:contains("gb_")').remove();
+
+        // Keep only the main search results
+        const mainContent = $('#main');
+        if (mainContent.length) {
+          $('body').empty().append(mainContent);
+        }
+      } else {
+        // For non-Google pages, remove navigation elements
+        $('nav, header').remove();
+      }
 
       // Enhanced URL rewriting for all resources
       $('script[src], link[href], img[src], iframe[src], a[href], form[action]').each((_, el) => {

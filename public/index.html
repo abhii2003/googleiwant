@@ -295,25 +295,6 @@
       loadUrl(HOME_URL, true);
     });
 
-    // Enhanced Google Search submit with suggestions
-    let searchTimeout;
-    googleSearchInput.addEventListener('input', e => {
-      clearTimeout(searchTimeout);
-      const query = e.target.value.trim();
-      if (query.length > 1) {
-        searchTimeout = setTimeout(() => {
-          const suggestUrl = `https://www.google.com/complete/search?client=chrome&q=${encodeURIComponent(query)}`;
-          fetch(proxiedUrl(suggestUrl))
-            .then(res => res.json())
-            .then(data => {
-              // Google search suggestions are available in data[1]
-              console.log('Search suggestions:', data[1]);
-            })
-            .catch(err => console.error('Error fetching suggestions:', err));
-        }, 300);
-      }
-    });
-
     // Google Search submit with enhanced functionality
     googleSearchForm.addEventListener('submit', e => {
       e.preventDefault();
@@ -325,13 +306,11 @@
         loadUrl(query, true);
       } else {
         // If not a URL, perform Google search
-        const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+        const googleUrl = `https://www.google.com/search?igu=1&q=${encodeURIComponent(query)}`;
         loadUrl(googleUrl, true);
       }
       googleSearchInput.value = '';
-    });
-
-    // Initialize with home page
+    });    // Initialize with home page
     loadUrl(HOME_URL, true);
 
   </script>
