@@ -42,7 +42,19 @@ exports.handler = async (event) => {
     // Parse and normalize URL
     let parsedUrl;
     try {
-      parsedUrl = new URL(url);
+      // Handle form submissions properly
+      if (method.toUpperCase() === 'GET' && formData) {
+        // For GET requests, ensure form data is properly added to URL
+        parsedUrl = new URL(url);
+        for (const [key, value] of formData.entries()) {
+          if (!key.startsWith('_proxy')) {
+            parsedUrl.searchParams.set(key, value);
+          }
+        }
+      } else {
+        parsedUrl = new URL(url);
+      }
+
       if (parsedUrl.protocol === 'http:') {
         parsedUrl.protocol = 'https:';
       }
@@ -105,7 +117,13 @@ exports.handler = async (event) => {
     $('base').remove();
     $('meta[http-equiv="Content-Security-Policy"]').remove();
 
-    // Special handling for Google
+    // Add jQuery if not present (for sites that depend on it)
+    $('head').prepend(`
+      <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+      <script>if(typeof jQuery==='undefined'){window.jQuery=false;}</script>
+    `);
+
+    // Special handling for various sites
     if (parsedUrl.hostname.includes('google.com')) {
       // Remove elements that might cause issues
       $('script[src*="xjs/_/js/"]').remove();
@@ -113,16 +131,33 @@ exports.handler = async (event) => {
       $('link[rel="preload"]').remove();
       $('script:contains("google.sn =")').remove();
       $('script:contains("google.pmc =")').remove();
-
-      // Clean up forms
-      $('form').each((_, form) => {
-        const $form = $(form);
-        // Remove onsubmit handlers
-        $form.removeAttr('onsubmit');
-        // Add our own target
-        $form.attr('target', '_self');
-      });
+    } else if (parsedUrl.hostname.includes('geeksforgeeks.org')) {
+      // Special handling for GeeksForGeeks
+      $('script[src*="adsbygoogle"]').remove();
+      $('script[src*="google-analytics"]').remove();
+      $('script[src*="googletagmanager"]').remove();
+      $('ins.adsbygoogle').remove();
+      // Add error handling for jQuery
+      $('body').append(`
+        <script>
+          window.onerror = function(msg, url, line) {
+            if (msg.includes('$ is not defined')) {
+              console.log('jQuery error caught and handled');
+              return true;
+            }
+          };
+        </script>
+      `);
     }
+
+    // Clean up forms
+    $('form').each((_, form) => {
+      const $form = $(form);
+      // Remove onsubmit handlers
+      $form.removeAttr('onsubmit');
+      // Add our own target
+      $form.attr('target', '_self');
+    });
 
     // Process all URLs in the page
     $('a[href], img[src], script[src], link[href], source[src], form[action], iframe[src]').each((_, el) => {
@@ -175,7 +210,7 @@ exports.handler = async (event) => {
         'Access-Control-Allow-Headers': '*',
         'Cross-Origin-Resource-Policy': 'cross-origin',
         'Cross-Origin-Embedder-Policy': 'unsafe-none',
-        'Feature-Policy': '*',
+        'Permissions-Policy': 'accelerometer=*, camera=*, geolocation=*, gyroscope=*, magnetometer=*, microphone=*, payment=*, usb=*',
         'Referrer-Policy': 'no-referrer'
       },
       body: $.html()
