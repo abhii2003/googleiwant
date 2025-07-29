@@ -1,23 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="en" >
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Web Viewer</title>
-  <link rel="preconnect" href="https://www.google.com">
-  <link rel="dns-prefetch" href="https://www.google.com">
+  <title>WOW Proxy</title>
   <style>
     /* Reset */
     * {
       box-sizing: border-box;
     }
-
-    body,
-    html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
+    body, html {
+      margin: 0; padding: 0; height: 100%;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: #333;
@@ -25,9 +18,8 @@
       flex-direction: column;
       overflow: hidden;
     }
-
     header {
-      background: linear-gradient(135deg, #3f51b5 0%, #5c6bc0 100%);
+      background: #3f51b5;
       color: white;
       padding: 1rem 2rem;
       font-size: 1.8rem;
@@ -38,86 +30,60 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
-
     header .title {
       font-family: 'Segoe UI Black', 'Segoe UI', sans-serif;
-      text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.4);
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
     }
-
     #nav-bar {
       display: flex;
       gap: 0.75rem;
       align-items: center;
-      flex-wrap: wrap;
-      padding: 0.5rem 0;
-      max-width: 100%;
+      flex-wrap: nowrap;
     }
-
-    button,
-    input[type="text"] {
+    button, input[type="text"] {
       border-radius: 6px;
       border: none;
       font-size: 1rem;
       padding: 0.5rem 0.9rem;
-      transition: all 0.3s ease;
+      transition: background-color 0.3s ease, box-shadow 0.2s ease;
       outline: none;
       font-weight: 600;
       cursor: pointer;
       user-select: none;
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
     }
-
     button:disabled {
       cursor: default;
       opacity: 0.5;
       box-shadow: none;
     }
-
     button {
-      background: linear-gradient(135deg, #5c6bc0 0%, #3f51b5 100%);
+      background-color: #5c6bc0;
       color: white;
       box-shadow: 0 2px 6px rgb(0 0 0 / 0.15);
-      border: 1px solid rgba(255, 255, 255, 0.1);
     }
-
     button:hover:not(:disabled) {
-      background: linear-gradient(135deg, #3949ab 0%, #303f9f 100%);
+      background-color: #3949ab;
       box-shadow: 0 4px 10px rgb(0 0 0 / 0.25);
-      transform: translateY(-1px);
     }
-
     #urlInput {
-      min-width: 200px;
-      max-width: 100%;
-      flex: 1 1 auto;
+      min-width: 300px;
+      flex-grow: 1;
       padding-left: 1rem;
       font-weight: 500;
       color: #222;
       box-shadow: 0 2px 6px rgb(0 0 0 / 0.1);
-      transition: all 0.3s ease;
-      background: linear-gradient(to right, rgba(255, 255, 255, 0.95), white);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: box-shadow 0.3s ease;
     }
-
     #urlInput:focus {
-      box-shadow: 0 0 12px rgba(63, 81, 181, 0.5);
-      transform: translateY(-1px);
-      background: white;
+      box-shadow: 0 0 8px #3f51b5;
     }
-
     #googleSearchForm {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      margin-left: 0.5rem;
-      flex-wrap: nowrap;
-      min-width: 200px;
-      flex: 0 1 auto;
+      margin-left: 1rem;
     }
-
     #googleSearchInput {
       padding: 0.5rem 0.8rem;
       border-radius: 6px;
@@ -126,26 +92,22 @@
       width: 180px;
       box-shadow: 0 2px 6px rgb(0 0 0 / 0.15);
     }
-
     #googleSearchInput:focus {
       box-shadow: 0 0 8px #3f51b5;
       outline: none;
     }
-
     #frame-container {
       flex-grow: 1;
       position: relative;
       box-shadow: inset 0 0 10px rgb(0 0 0 / 0.1);
       border-top: 2px solid #3949ab;
     }
-
     iframe {
       width: 100%;
       height: 100%;
       border: none;
       background: white;
     }
-
     /* Responsive */
     @media (max-width: 700px) {
       header {
@@ -153,13 +115,11 @@
         justify-content: center;
         gap: 0.75rem;
       }
-
       #urlInput {
         min-width: unset;
         width: 100%;
         flex-grow: 1;
       }
-
       #googleSearchForm {
         margin-left: 0;
         width: 100%;
@@ -168,19 +128,33 @@
     }
   </style>
 </head>
-
 <body>
   <header>
-    <div class="title">Web Viewer</div>
+    <div class="title">WOW Proxy</div>
     <nav id="nav-bar" aria-label="Browser navigation">
+      <button id="backBtn" disabled title="Back">&larr;</button>
+      <button id="forwardBtn" disabled title="Forward">&rarr;</button>
       <button id="reloadBtn" title="Reload">&#x21bb;</button>
       <button id="homeBtn" title="Home">🏠</button>
-      <input type="text" id="urlInput" placeholder="Enter URL (e.g. example.com)" autocomplete="off" spellcheck="false"
-        aria-label="URL input" />
+      <input
+        type="text"
+        id="urlInput"
+        placeholder="Enter full URL (e.g. https://example.com/page)"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="URL input"
+      />
       <button id="goBtn" title="Go">Go</button>
       <form id="googleSearchForm" role="search" aria-label="Google Search">
-        <input type="text" id="googleSearchInput" placeholder="Google Search" autocomplete="off" spellcheck="false"
-          aria-label="Google search query" name="q" />
+        <input
+          type="text"
+          id="googleSearchInput"
+          placeholder="Google Search"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Google search query"
+          name="q"
+        />
         <button id="googleSearchBtn" type="submit" title="Search Google">🔍</button>
       </form>
     </nav>
@@ -203,6 +177,10 @@
 
     const HOME_URL = 'https://www.google.com';
 
+    // History stack management for iframe navigation
+    let historyStack = [];
+    let currentIndex = -1;
+
     // Normalize URL (add https if missing)
     function normalizeUrl(url) {
       url = url.trim();
@@ -213,15 +191,35 @@
       return url;
     }
 
-    // Load URL in iframe through proxy
-    function loadUrl(url) {
+    // Build proxied URL for iframe src
+    function proxiedUrl(url) {
+      return '/.netlify/functions/proxy?url=' + encodeURIComponent(url);
+    }
+
+    // Load URL in iframe and update history
+    function loadUrl(url, pushHistory = true) {
       if (!url) return;
       const normUrl = normalizeUrl(url);
-      const proxyUrl = new URL('/.netlify/functions/proxy', window.location.origin);
-      proxyUrl.searchParams.set('url', normUrl);
-      frame.src = proxyUrl.toString();
+
+      if (pushHistory) {
+        // If navigating forward after going back, discard forward history
+        historyStack = historyStack.slice(0, currentIndex + 1);
+        historyStack.push(normUrl);
+        currentIndex++;
+      }
+
+      frame.src = proxiedUrl(normUrl);
       urlInput.value = normUrl;
+      updateNavButtons();
     }
+
+    // Update state of navigation buttons
+    function updateNavButtons() {
+      backBtn.disabled = currentIndex <= 0;
+      forwardBtn.disabled = currentIndex >= historyStack.length - 1;
+    }
+
+    // Event handlers
 
     // Go button or Enter in URL input
     goBtn.addEventListener('click', () => {
@@ -230,9 +228,8 @@
         alert('Please enter a valid URL');
         return;
       }
-      loadUrl(url);
+      loadUrl(url, true);
     });
-
     urlInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -240,40 +237,51 @@
       }
     });
 
+    // Back
+    backBtn.addEventListener('click', () => {
+      if (currentIndex > 0) {
+        currentIndex--;
+        frame.src = proxiedUrl(historyStack[currentIndex]);
+        urlInput.value = historyStack[currentIndex];
+        updateNavButtons();
+      }
+    });
+
+    // Forward
+    forwardBtn.addEventListener('click', () => {
+      if (currentIndex < historyStack.length - 1) {
+        currentIndex++;
+        frame.src = proxiedUrl(historyStack[currentIndex]);
+        urlInput.value = historyStack[currentIndex];
+        updateNavButtons();
+      }
+    });
+
     // Reload
     reloadBtn.addEventListener('click', () => {
-      frame.src = frame.src;
+      if (currentIndex >= 0) {
+        frame.src = proxiedUrl(historyStack[currentIndex]);
+      }
     });
 
     // Home
     homeBtn.addEventListener('click', () => {
-      loadUrl(HOME_URL);
+      loadUrl(HOME_URL, true);
     });
 
-    // Google Search
+    // Google Search submit
     googleSearchForm.addEventListener('submit', e => {
       e.preventDefault();
       const query = googleSearchInput.value.trim();
       if (!query) return;
-
-      // Check if it's a URL first
-      if (query.includes('.') && !query.includes(' ')) {
-        loadUrl(query);
-      } else {
-        // If not a URL, perform Google search
-        const googleUrl = new URL('https://www.google.com/search');
-        googleUrl.searchParams.set('q', query);
-        googleUrl.searchParams.set('hl', 'en');
-        googleUrl.searchParams.set('safe', 'active');
-        loadUrl(googleUrl.toString());
-      }
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+      loadUrl(googleUrl, true);
       googleSearchInput.value = '';
     });
 
     // Initialize with home page
-    loadUrl(HOME_URL);
+    loadUrl(HOME_URL, true);
 
   </script>
 </body>
-
 </html>
