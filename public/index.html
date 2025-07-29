@@ -1,287 +1,77 @@
 <!DOCTYPE html>
-<html lang="en" >
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WOW Proxy</title>
-  <style>
-    /* Reset */
-    * {
-      box-sizing: border-box;
-    }
-    body, html {
-      margin: 0; padding: 0; height: 100%;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #333;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    header {
-      background: #3f51b5;
-      color: white;
-      padding: 1rem 2rem;
-      font-size: 1.8rem;
-      font-weight: 700;
-      letter-spacing: 1.2px;
-      user-select: none;
-      box-shadow: 0 4px 8px rgb(0 0 0 / 0.2);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    header .title {
-      font-family: 'Segoe UI Black', 'Segoe UI', sans-serif;
-      text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
-    }
-    #nav-bar {
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-      flex-wrap: nowrap;
-    }
-    button, input[type="text"] {
-      border-radius: 6px;
-      border: none;
-      font-size: 1rem;
-      padding: 0.5rem 0.9rem;
-      transition: background-color 0.3s ease, box-shadow 0.2s ease;
-      outline: none;
-      font-weight: 600;
-      cursor: pointer;
-      user-select: none;
-    }
-    button:disabled {
-      cursor: default;
-      opacity: 0.5;
-      box-shadow: none;
-    }
-    button {
-      background-color: #5c6bc0;
-      color: white;
-      box-shadow: 0 2px 6px rgb(0 0 0 / 0.15);
-    }
-    button:hover:not(:disabled) {
-      background-color: #3949ab;
-      box-shadow: 0 4px 10px rgb(0 0 0 / 0.25);
-    }
-    #urlInput {
-      min-width: 300px;
-      flex-grow: 1;
-      padding-left: 1rem;
-      font-weight: 500;
-      color: #222;
-      box-shadow: 0 2px 6px rgb(0 0 0 / 0.1);
-      transition: box-shadow 0.3s ease;
-    }
-    #urlInput:focus {
-      box-shadow: 0 0 8px #3f51b5;
-    }
-    #googleSearchForm {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-left: 1rem;
-    }
-    #googleSearchInput {
-      padding: 0.5rem 0.8rem;
-      border-radius: 6px;
-      border: none;
-      font-size: 1rem;
-      width: 180px;
-      box-shadow: 0 2px 6px rgb(0 0 0 / 0.15);
-    }
-    #googleSearchInput:focus {
-      box-shadow: 0 0 8px #3f51b5;
-      outline: none;
-    }
-    #frame-container {
-      flex-grow: 1;
-      position: relative;
-      box-shadow: inset 0 0 10px rgb(0 0 0 / 0.1);
-      border-top: 2px solid #3949ab;
-    }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      background: white;
-    }
-    /* Responsive */
-    @media (max-width: 700px) {
-      header {
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.75rem;
-      }
-      #urlInput {
-        min-width: unset;
-        width: 100%;
-        flex-grow: 1;
-      }
-      #googleSearchForm {
-        margin-left: 0;
-        width: 100%;
-        justify-content: center;
-      }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simple URL Loader</title>
+<style>
+  body, html {
+    margin: 0; padding: 0; height: 100%;
+    font-family: Arial, sans-serif;
+  }
+  #navbar {
+    padding: 10px;
+    background: #eee;
+  }
+  #urlInput {
+    width: 80%;
+    font-size: 16px;
+    padding: 6px 8px;
+  }
+  #goBtn {
+    font-size: 16px;
+    padding: 6px 12px;
+  }
+  #content {
+    height: calc(100vh - 50px);
+  }
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+</style>
 </head>
 <body>
-  <header>
-    <div class="title">WOW Proxy</div>
-    <nav id="nav-bar" aria-label="Browser navigation">
-      <button id="backBtn" disabled title="Back">&larr;</button>
-      <button id="forwardBtn" disabled title="Forward">&rarr;</button>
-      <button id="reloadBtn" title="Reload">&#x21bb;</button>
-      <button id="homeBtn" title="Home">🏠</button>
-      <input
-        type="text"
-        id="urlInput"
-        placeholder="Enter full URL (e.g. https://example.com/page)"
-        autocomplete="off"
-        spellcheck="false"
-        aria-label="URL input"
-      />
-      <button id="goBtn" title="Go">Go</button>
-      <form id="googleSearchForm" role="search" aria-label="Google Search">
-        <input
-          type="text"
-          id="googleSearchInput"
-          placeholder="Google Search"
-          autocomplete="off"
-          spellcheck="false"
-          aria-label="Google search query"
-          name="q"
-        />
-        <button id="googleSearchBtn" type="submit" title="Search Google">🔍</button>
-      </form>
-    </nav>
-  </header>
 
-  <div id="frame-container">
-    <iframe id="frame" src="" title="Loaded page"></iframe>
-  </div>
+<div id="navbar">
+  <input type="text" id="urlInput" placeholder="Enter full URL (e.g. www.example.com/page)" />
+  <button id="goBtn">Go</button>
+</div>
 
-  <script>
-    const urlInput = document.getElementById('urlInput');
-    const goBtn = document.getElementById('goBtn');
-    const frame = document.getElementById('frame');
-    const backBtn = document.getElementById('backBtn');
-    const forwardBtn = document.getElementById('forwardBtn');
-    const reloadBtn = document.getElementById('reloadBtn');
-    const homeBtn = document.getElementById('homeBtn');
-    const googleSearchForm = document.getElementById('googleSearchForm');
-    const googleSearchInput = document.getElementById('googleSearchInput');
+<div id="content">
+  <iframe id="frame" src=""></iframe>
+</div>
 
-    const HOME_URL = 'https://www.google.com';
+<script>
+  const urlInput = document.getElementById('urlInput');
+  const goBtn = document.getElementById('goBtn');
+  const frame = document.getElementById('frame');
 
-    // History stack management for iframe navigation
-    let historyStack = [];
-    let currentIndex = -1;
+  function loadURL(url) {
+    url = url.trim();
+    if (!url) return;
 
-    // Normalize URL (add https if missing)
-    function normalizeUrl(url) {
-      url = url.trim();
-      if (!url) return '';
-      if (!/^https?:\/\//i.test(url)) {
-        url = 'https://' + url;
-      }
-      return url;
+    // Add https:// if missing
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
     }
 
-    // Build proxied URL for iframe src
-    function proxiedUrl(url) {
-      return '/.netlify/functions/proxy?url=' + encodeURIComponent(url);
+    // Build proxy function URL to load in iframe
+    const proxyUrl = '/.netlify/functions/proxy?url=' + encodeURIComponent(url);
+    frame.src = proxyUrl;
+  }
+
+  goBtn.addEventListener('click', () => {
+    loadURL(urlInput.value);
+  });
+
+  urlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      loadURL(urlInput.value);
     }
+  });
+</script>
 
-    // Load URL in iframe and update history
-    function loadUrl(url, pushHistory = true) {
-      if (!url) return;
-      const normUrl = normalizeUrl(url);
-
-      if (pushHistory) {
-        // If navigating forward after going back, discard forward history
-        historyStack = historyStack.slice(0, currentIndex + 1);
-        historyStack.push(normUrl);
-        currentIndex++;
-      }
-
-      frame.src = proxiedUrl(normUrl);
-      urlInput.value = normUrl;
-      updateNavButtons();
-    }
-
-    // Update state of navigation buttons
-    function updateNavButtons() {
-      backBtn.disabled = currentIndex <= 0;
-      forwardBtn.disabled = currentIndex >= historyStack.length - 1;
-    }
-
-    // Event handlers
-
-    // Go button or Enter in URL input
-    goBtn.addEventListener('click', () => {
-      const url = urlInput.value;
-      if (!url.trim()) {
-        alert('Please enter a valid URL');
-        return;
-      }
-      loadUrl(url, true);
-    });
-    urlInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        goBtn.click();
-      }
-    });
-
-    // Back
-    backBtn.addEventListener('click', () => {
-      if (currentIndex > 0) {
-        currentIndex--;
-        frame.src = proxiedUrl(historyStack[currentIndex]);
-        urlInput.value = historyStack[currentIndex];
-        updateNavButtons();
-      }
-    });
-
-    // Forward
-    forwardBtn.addEventListener('click', () => {
-      if (currentIndex < historyStack.length - 1) {
-        currentIndex++;
-        frame.src = proxiedUrl(historyStack[currentIndex]);
-        urlInput.value = historyStack[currentIndex];
-        updateNavButtons();
-      }
-    });
-
-    // Reload
-    reloadBtn.addEventListener('click', () => {
-      if (currentIndex >= 0) {
-        frame.src = proxiedUrl(historyStack[currentIndex]);
-      }
-    });
-
-    // Home
-    homeBtn.addEventListener('click', () => {
-      loadUrl(HOME_URL, true);
-    });
-
-    // Google Search submit
-    googleSearchForm.addEventListener('submit', e => {
-      e.preventDefault();
-      const query = googleSearchInput.value.trim();
-      if (!query) return;
-      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-      loadUrl(googleUrl, true);
-      googleSearchInput.value = '';
-    });
-
-    // Initialize with home page
-    loadUrl(HOME_URL, true);
-
-  </script>
 </body>
 </html>
